@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/vehicle.dart';
 
+// Importe o Provider e o Serviço
+import 'package:provider/provider.dart';
+import '../services/vehicle_service.dart';
+
 class VehicleEditModal extends StatefulWidget {
   final Vehicle vehicle;
 
@@ -56,6 +60,9 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
     });
 
     try {
+      // Obtenha o serviço
+      final vehicleService = context.read<VehicleService>();
+
       final updatedVehicle = widget.vehicle.copyWith(
         marca: _marcaController.text.trim(),
         modelo: _modeloController.text.trim(),
@@ -65,10 +72,12 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
         descricao: _descricaoController.text.trim(),
       );
 
-      // TODO: Implementar atualização no Firestore
+      // ! ALTERAÇÃO: Chame o serviço
+      await vehicleService.updateVehicle(updatedVehicle);
       
       if (mounted) {
-        Navigator.pop(context, updatedVehicle);
+        // ! MUDANÇA: Apenas feche o modal. A tela de lista vai se atualizar sozinha.
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -130,6 +139,10 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
+      ),
+      // Use Padding para evitar que o teclado cubra os campos
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.9,
@@ -261,7 +274,7 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _saveChanges,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: Colors.blue, // Cor diferente para 'Editar'
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 // import 'dart:io';
 import '../models/vehicle.dart';
 
+// Importe o Provider e o Serviço
+import 'package:provider/provider.dart';
+import '../services/vehicle_service.dart';
+
 class AddVehicleScreen extends StatefulWidget {
   final bool showAppBar;
   
@@ -81,6 +85,9 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     });
 
     try {
+      // Obtenha o serviço (sem "ouvir" mudanças, apenas para chamar a função)
+      final vehicleService = context.read<VehicleService>();
+      
       final vehicle = Vehicle(
         marca: _marcaController.text.trim(),
         modelo: _modeloController.text.trim(),
@@ -91,11 +98,19 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         dataCadastro: DateTime.now(),
       );
 
-      // TODO: Implementar salvamento no Firestore
-      // await vehicleService.addVehicle(vehicle);
+      await vehicleService.addVehicle(vehicle);
       
       if (mounted) {
-        Navigator.pop(context);
+        _formKey.currentState?.reset();
+        _marcaController.clear();
+        _modeloController.clear();
+        _anoController.clear();
+        _corController.clear();
+        _precoController.clear();
+        _descricaoController.clear();
+
+        FocusScope.of(context).unfocus();
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Veículo cadastrado com sucesso!'),

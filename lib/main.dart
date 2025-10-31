@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 // import 'package:firebase_core/firebase_core.dart';
-// import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_vehicle_screen.dart';
-// import 'services/auth_service.dart';
+import 'services/auth_service.dart';
+import 'services/vehicle_service.dart';
 // import 'firebase_options.dart';
 
 void main() async {
@@ -15,7 +16,14 @@ void main() async {
   //   options: DefaultFirebaseOptions.currentPlatform,
   // );
   
-  runApp(const CarStoreApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => VehicleService()),
+      ],
+      child: const CarStoreApp(), // O nome do seu widget principal (ex: MyApp)
+    ),);
 }
 
 class CarStoreApp extends StatelessWidget {

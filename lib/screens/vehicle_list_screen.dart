@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-// import 'package:provider/provider.dart';
+import 'package:provider/provider.dart';
+import '../services/vehicle_service.dart';
+
 import '../models/vehicle.dart';
 import '../widgets/vehicle_card.dart';
 import '../widgets/vehicle_edit_modal.dart';
@@ -21,17 +23,48 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   String _selectedBrand = 'Todas';
   final TextEditingController _searchController = TextEditingController();
 
+  late VehicleService _vehicleService;
+  
+  bool _isListenerInitialized = false;
+
   @override
   void initState() {
     super.initState();
-    _loadVehicles();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadVehicles();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    if (!_isListenerInitialized) {
+      // Obtenha a instância do serviço
+      _vehicleService = Provider.of<VehicleService>(context, listen: false);
+      
+      // Adicione um ouvinte
+      _vehicleService.addListener(_onVehicleListChanged);
+      
+      _isListenerInitialized = true; // Marque como inicializado
+    }
   }
 
   @override
   void dispose() {
+    if (_isListenerInitialized) {
+      _vehicleService.removeListener(_onVehicleListChanged);
+    }
     _searchController.dispose();
     super.dispose();
   }
+
+  void _onVehicleListChanged() {
+    if (mounted) {
+      _loadVehicles();
+    }
+  }
+
 
   Future<void> _loadVehicles() async {
     setState(() {
@@ -39,54 +72,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     });
 
     try {
-      // TODO: Implementar carregamento do Firestore
-      // Dados simulados para demonstração
-      vehicles = [
-        Vehicle(
-          id: '1',
-          marca: 'Toyota',
-          modelo: 'Corolla',
-          ano: 2022,
-          cor: 'Branco',
-          preco: 95000.00,
-          descricao: 'Sedan automático, completo, baixo km, revisões em dia',
-          imagemUrl: 'https://example.com/corolla.jpg',
-          dataCadastro: DateTime.now(),
-        ),
-        Vehicle(
-          id: '2',
-          marca: 'Honda',
-          modelo: 'Civic',
-          ano: 2023,
-          cor: 'Prata',
-          preco: 110000.00,
-          descricao: 'Sedan esportivo, turbo, multimídia, couro',
-          imagemUrl: 'https://example.com/civic.jpg',
-          dataCadastro: DateTime.now(),
-        ),
-        Vehicle(
-          id: '3',
-          marca: 'Volkswagen',
-          modelo: 'Jetta',
-          ano: 2021,
-          cor: 'Preto',
-          preco: 85000.00,
-          descricao: 'Sedan elegante, automático, ar digital',
-          imagemUrl: 'https://example.com/jetta.jpg',
-          dataCadastro: DateTime.now(),
-        ),
-        Vehicle(
-          id: '4',
-          marca: 'Ford',
-          modelo: 'EcoSport',
-          ano: 2020,
-          cor: 'Azul',
-          preco: 65000.00,
-          descricao: 'SUV compacto, manual, ideal para cidade',
-          imagemUrl: 'https://example.com/ecosport.jpg',
-          dataCadastro: DateTime.now(),
-        ),
-      ];
+      final vehicleService = context.read<VehicleService>();
+      vehicles = await vehicleService.getVehicles();
+      
       _applyFilters();
     } catch (e) {
       if (mounted) {
@@ -117,7 +105,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       return matchesSearch && matchesBrand;
     }).toList();
     
-    setState(() {});
+    setState(() {}); // Aplica o filtro na UI
   }
 
   void _onSearchChanged(String query) {
@@ -141,29 +129,20 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Future<void> _editVehicle(Vehicle vehicle) async {
-    final result = await showModalBottomSheet<Vehicle>(
+    final bool? vehicleWasUpdated = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => VehicleEditModal(vehicle: vehicle),
     );
 
-    if (result != null) {
-      setState(() {
-        final index = vehicles.indexWhere((v) => v.id == result.id);
-        if (index != -1) {
-          vehicles[index] = result;
-        }
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veículo atualizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+    if (mounted && (vehicleWasUpdated == true || vehicleWasUpdated == null)) { 
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lista de veículos atualizada!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 
@@ -189,10 +168,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
     if (confirm == true) {
       try {
-        // TODO: Implementar exclusão no Firestore
-        setState(() {
-          vehicles.removeWhere((v) => v.id == vehicle.id);
-        });
+        final vehicleService = context.read<VehicleService>();
+        await vehicleService.deleteVehicle(vehicle);
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -235,7 +212,10 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     );
 
     if (confirm == true) {
-      // TODO: Implementar logout do Firebase
+      // TODO: Implementar logout do Firebase com AuthService
+      // final authService = context.read<AuthService>();
+      // await authService.signOut();
+      
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/login');
       }
@@ -410,11 +390,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             Text(
                               _searchQuery.isNotEmpty || _selectedBrand != 'Todas'
                                   ? 'Tente ajustar os filtros'
-                                  : 'Toque em + para adicionar seu primeiro veículo',
+                                  : 'Toque em "Cadastrar" para adicionar seu primeiro veículo',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
@@ -440,7 +421,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       floatingActionButton: widget.showAppBar ? FloatingActionButton(
         onPressed: () {
           Navigator.pushNamed(context, '/add-vehicle').then((_) {
-            _loadVehicles(); // Recarregar lista após adicionar
           });
         },
         backgroundColor: const Color(0xFF6A1B9A),

@@ -18,11 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // TODO: Implementar integração com Firebase Auth
-      // final authService = Provider.of<AuthService>(context, listen: false);
-      // await authService.signInWithGoogle();
-      
-      // Simulação temporária - navegar para tela principal
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/home');
       }
