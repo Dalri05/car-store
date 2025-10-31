@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 // import 'package:firebase_core/firebase_core.dart';
-// import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_vehicle_screen.dart';
+import 'providers/vehicle_provider.dart';
 // import 'services/auth_service.dart';
 // import 'firebase_options.dart';
 
@@ -23,9 +24,13 @@ class CarStoreApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Car Store',
-      debugShowCheckedModeBanner: false,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => VehicleProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Car Store',
+        debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.deepPurple,
         primaryColor: const Color(0xFF6A1B9A),
@@ -68,6 +73,7 @@ class CarStoreApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/add-vehicle': (context) => const AddVehicleScreen(),
       },
+      ),
     );
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 // import 'package:image_picker/image_picker.dart';
 // import 'dart:io';
 import '../models/vehicle.dart';
+import '../providers/vehicle_provider.dart';
 
 class AddVehicleScreen extends StatefulWidget {
   final bool showAppBar;
@@ -91,17 +93,28 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         dataCadastro: DateTime.now(),
       );
 
-      // TODO: Implementar salvamento no Firestore
-      // await vehicleService.addVehicle(vehicle);
+      await Provider.of<VehicleProvider>(context, listen: false).addVehicle(vehicle);
       
       if (mounted) {
-        Navigator.pop(context);
+        // Limpar formulário
+        _marcaController.clear();
+        _modeloController.clear();
+        _anoController.clear();
+        _corController.clear();
+        _precoController.clear();
+        _descricaoController.clear();
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Veículo cadastrado com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
+        
+        // Se está na navegação em abas, não navegar
+        if (widget.showAppBar) {
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {
