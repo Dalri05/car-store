@@ -31,7 +31,6 @@ class VehicleCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagem em destaque
           Container(
             height: 200,
             width: double.infinity,
@@ -66,13 +65,11 @@ class VehicleCard extends StatelessWidget {
             ),
           ),
           
-          // Conteúdo do card
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Título e preço
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,7 +156,6 @@ class VehicleCard extends StatelessWidget {
                 
                 const SizedBox(height: 12),
                 
-                // Descrição
                 Text(
                   vehicle.descricao,
                   style: TextStyle(
@@ -173,7 +169,6 @@ class VehicleCard extends StatelessWidget {
                 
                 const SizedBox(height: 16),
                 
-                // Botões de ação
                 Row(
                   children: [
                     Expanded(

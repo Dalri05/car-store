@@ -1,11 +1,12 @@
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
 
 class AuthService extends ChangeNotifier {
-  // final FirebaseAuth _auth = FirebaseAuth.instance;
-  // final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   
   AppUser? _currentUser;
   bool _isLoading = false;
@@ -14,8 +15,6 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
 
-  // TODO: Implementar quando Firebase for configurado
-  /*
   AuthService() {
     _auth.authStateChanges().listen((User? user) {
       if (user != null) {
@@ -39,7 +38,11 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
 
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
+      if (googleUser == null) {
+        _isLoading = false;
+        notifyListeners();
+        return null;
+      }
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
@@ -61,13 +64,12 @@ class AuthService extends ChangeNotifier {
           ultimoLogin: DateTime.now(),
         );
         
-        // Salvar/atualizar dados do usuário no Firestore
         await _saveUserToFirestore(_currentUser!);
       }
 
       return _currentUser;
     } catch (e) {
-      print('Erro no login com Google: $e');
+      debugPrint('Erro no login com Google: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -82,7 +84,7 @@ class AuthService extends ChangeNotifier {
       _currentUser = null;
       notifyListeners();
     } catch (e) {
-      print('Erro ao fazer logout: $e');
+      debugPrint('Erro ao fazer logout: $e');
       rethrow;
     }
   }
@@ -94,44 +96,7 @@ class AuthService extends ChangeNotifier {
           .doc(user.id)
           .set(user.toMap(), SetOptions(merge: true));
     } catch (e) {
-      print('Erro ao salvar usuário no Firestore: $e');
-    }
-  }
-  */
-
-  // Métodos simulados para desenvolvimento
-  Future<AppUser?> signInWithGoogle() async {
-    try {
-      _isLoading = true;
-      notifyListeners();
-
-      // Simular delay de rede
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Simular usuário logado
-      _currentUser = AppUser(
-        id: 'demo_user_123',
-        email: 'demo@carstore.com',
-        nome: 'Usuário Demo',
-        fotoUrl: null,
-        ultimoLogin: DateTime.now(),
-      );
-
-      return _currentUser;
-    } catch (e) {
-      rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> signOut() async {
-    try {
-      _currentUser = null;
-      notifyListeners();
-    } catch (e) {
-      rethrow;
+      debugPrint('Erro ao salvar usuário no Firestore: $e');
     }
   }
 }

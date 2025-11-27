@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-// import 'package:image_picker/image_picker.dart';
-// import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+
 import '../models/vehicle.dart';
 import '../providers/vehicle_provider.dart';
 
@@ -24,7 +25,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
   final _precoController = TextEditingController();
   final _descricaoController = TextEditingController();
   
-  // File? _selectedImage;
+  Uint8List? _selectedImageBytes;
   bool _isLoading = false;
 
   @override
@@ -40,27 +41,20 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
 
   Future<void> _pickImage() async {
     try {
-      // TODO: Implementar seleção de imagem
-      // final picker = ImagePicker();
-      // final pickedFile = await picker.pickImage(
-      //   source: ImageSource.gallery,
-      //   maxWidth: 800,
-      //   maxHeight: 600,
-      //   imageQuality: 80,
-      // );
-      
-      // if (pickedFile != null) {
-      //   setState(() {
-      //     _selectedImage = File(pickedFile.path);
-      //   });
-      // }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Funcionalidade de imagem será implementada em breve'),
-          backgroundColor: Colors.orange,
-        ),
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 600,
+        imageQuality: 80,
       );
+      
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _selectedImageBytes = bytes;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -93,16 +87,19 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         dataCadastro: DateTime.now(),
       );
 
-      await Provider.of<VehicleProvider>(context, listen: false).addVehicle(vehicle);
+      await Provider.of<VehicleProvider>(context, listen: false)
+          .addVehicle(vehicle, imageBytes: _selectedImageBytes);
       
       if (mounted) {
-        // Limpar formulário
         _marcaController.clear();
         _modeloController.clear();
         _anoController.clear();
         _corController.clear();
         _precoController.clear();
         _descricaoController.clear();
+        setState(() {
+          _selectedImageBytes = null;
+        });
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -111,7 +108,6 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
           ),
         );
         
-        // Se está na navegação em abas, não navegar
         if (widget.showAppBar) {
           Navigator.pop(context);
         }
@@ -135,35 +131,23 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
   }
 
   String? _validateRequired(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName é obrigatório';
-    }
+    if (value == null || value.trim().isEmpty) return '$fieldName é obrigatório';
     return null;
   }
 
   String? _validateYear(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Ano é obrigatório';
-    }
+    if (value == null || value.trim().isEmpty) return 'Ano é obrigatório';
     final year = int.tryParse(value.trim());
-    if (year == null) {
-      return 'Ano deve ser um número válido';
-    }
+    if (year == null) return 'Inválido';
     final currentYear = DateTime.now().year;
-    if (year < 1900 || year > currentYear + 1) {
-      return 'Ano deve estar entre 1900 e ${currentYear + 1}';
-    }
+    if (year < 1900 || year > currentYear + 1) return 'Entre 1900 e ${currentYear + 1}';
     return null;
   }
 
   String? _validatePrice(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Preço é obrigatório';
-    }
+    if (value == null || value.trim().isEmpty) return 'Preço obrigatório';
     final price = double.tryParse(value.trim().replaceAll(',', '.'));
-    if (price == null || price <= 0) {
-      return 'Preço deve ser um valor válido maior que zero';
-    }
+    if (price == null || price <= 0) return 'Valor inválido';
     return null;
   }
 
@@ -178,7 +162,6 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
       ) : null,
       body: Column(
         children: [
-          // Header quando não há AppBar
           if (!widget.showAppBar)
             Container(
               width: double.infinity,
@@ -195,110 +178,72 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                 children: [
                   Text(
                     'Cadastrar Veículo',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   SizedBox(height: 8),
-                  Text(
-                    'Preencha os dados do seu veículo',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white70,
-                    ),
-                  ),
+                  Text('Preencha os dados do seu veículo', style: TextStyle(fontSize: 16, color: Colors.white70)),
                 ],
               ),
             ),
           
-          // Formulário
           Expanded(
             child: Form(
               key: _formKey,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // Seção da imagem
+                  // Área da Imagem
                   Container(
                     height: 200,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF6A1B9A).withOpacity(0.1),
-                          const Color(0xFF8E24AA).withOpacity(0.1),
-                        ],
-                      ),
+                      color: Colors.grey[200],
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: const Color(0xFF6A1B9A).withOpacity(0.3)),
                     ),
                     child: InkWell(
                       onTap: _pickImage,
                       borderRadius: BorderRadius.circular(16),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate,
-                            size: 48,
-                            color: Color(0xFF6A1B9A),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Toque para adicionar foto',
-                            style: TextStyle(
-                              color: Color(0xFF6A1B9A),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                      child: _selectedImageBytes != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Image.memory(
+                                _selectedImageBytes!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                              ),
+                            )
+                          : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_photo_alternate, size: 48, color: Color(0xFF6A1B9A)),
+                                SizedBox(height: 8),
+                                Text('Toque para adicionar foto', style: TextStyle(color: Color(0xFF6A1B9A))),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                   
                   const SizedBox(height: 24),
-                  
-                  // Campos do formulário
+                  // Campos...
                   TextFormField(
                     controller: _marcaController,
-                    decoration: const InputDecoration(
-                      labelText: 'Marca *',
-                      hintText: 'Ex: Toyota, Honda, Ford',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) => _validateRequired(value, 'Marca'),
-                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(labelText: 'Marca *', border: OutlineInputBorder()),
+                    validator: (v) => _validateRequired(v, 'Marca'),
                   ),
-                  
                   const SizedBox(height: 16),
-                  
                   TextFormField(
                     controller: _modeloController,
-                    decoration: const InputDecoration(
-                      labelText: 'Modelo *',
-                      hintText: 'Ex: Corolla, Civic, Focus',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) => _validateRequired(value, 'Modelo'),
-                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(labelText: 'Modelo *', border: OutlineInputBorder()),
+                    validator: (v) => _validateRequired(v, 'Modelo'),
                   ),
-                  
                   const SizedBox(height: 16),
-                  
                   Row(
                     children: [
                       Expanded(
                         child: TextFormField(
                           controller: _anoController,
-                          decoration: const InputDecoration(
-                            labelText: 'Ano *',
-                            hintText: '2023',
-                            border: OutlineInputBorder(),
-                          ),
+                          decoration: const InputDecoration(labelText: 'Ano *', border: OutlineInputBorder()),
                           validator: _validateYear,
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -308,82 +253,35 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _corController,
-                          decoration: const InputDecoration(
-                            labelText: 'Cor *',
-                            hintText: 'Ex: Branco, Preto',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) => _validateRequired(value, 'Cor'),
-                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(labelText: 'Cor *', border: OutlineInputBorder()),
+                          validator: (v) => _validateRequired(v, 'Cor'),
                         ),
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 16),
-                  
                   TextFormField(
                     controller: _precoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Preço (R\$) *',
-                      hintText: '50000.00',
-                      border: OutlineInputBorder(),
-                      prefixText: 'R\$ ',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Preço (R\$) *', border: OutlineInputBorder()),
                     validator: _validatePrice,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                   ),
-                  
                   const SizedBox(height: 16),
-                  
                   TextFormField(
                     controller: _descricaoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Descrição *',
-                      hintText: 'Descreva as características do veículo',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) => _validateRequired(value, 'Descrição'),
+                    decoration: const InputDecoration(labelText: 'Descrição *', border: OutlineInputBorder()),
+                    validator: (v) => _validateRequired(v, 'Descrição'),
                     maxLines: 3,
-                    textCapitalization: TextCapitalization.sentences,
                   ),
-                  
                   const SizedBox(height: 32),
-                  
-                  // Botão de salvar
                   SizedBox(
                     height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _saveVehicle,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6A1B9A),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'Cadastrar Veículo',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  const Text(
-                    '* Campos obrigatórios',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
+                          : const Text('Cadastrar Veículo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+
 import '../models/vehicle.dart';
+import '../providers/vehicle_provider.dart';
 
 class VehicleEditModal extends StatefulWidget {
   final Vehicle vehicle;
@@ -20,6 +25,7 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
   late TextEditingController _precoController;
   late TextEditingController _descricaoController;
   
+  Uint8List? _newSelectedImageBytes;
   bool _isLoading = false;
 
   @override
@@ -46,10 +52,33 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
     super.dispose();
   }
 
-  Future<void> _saveChanges() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 600,
+        imageQuality: 80,
+      );
+      
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _newSelectedImageBytes = bytes;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
     }
+  }
+
+  Future<void> _saveChanges() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
@@ -65,7 +94,8 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
         descricao: _descricaoController.text.trim(),
       );
 
-      // TODO: Implementar atualização no Firestore
+      await Provider.of<VehicleProvider>(context, listen: false)
+          .updateVehicle(updatedVehicle, newImageBytes: _newSelectedImageBytes);
       
       if (mounted) {
         Navigator.pop(context, updatedVehicle);
@@ -73,10 +103,7 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao atualizar veículo: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erro ao atualizar: ${e.toString()}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -88,48 +115,15 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
     }
   }
 
-  String? _validateRequired(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName é obrigatório';
-    }
-    return null;
-  }
-
-  String? _validateYear(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Ano é obrigatório';
-    }
-    final year = int.tryParse(value.trim());
-    if (year == null) {
-      return 'Ano deve ser um número válido';
-    }
-    final currentYear = DateTime.now().year;
-    if (year < 1900 || year > currentYear + 1) {
-      return 'Ano deve estar entre 1900 e ${currentYear + 1}';
-    }
-    return null;
-  }
-
-  String? _validatePrice(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Preço é obrigatório';
-    }
-    final price = double.tryParse(value.trim().replaceAll(',', '.'));
-    if (price == null || price <= 0) {
-      return 'Preço deve ser um valor válido maior que zero';
-    }
-    return null;
-  }
+  String? _validateRequired(String? v, String f) => (v == null || v.trim().isEmpty) ? '$f obrigatório' : null;
+  String? _validatePrice(String? v) => (v == null || v.isEmpty) ? 'Obrigatório' : null;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
       ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.9,
@@ -143,25 +137,13 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Editar Veículo',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
+                    const Text('Editar Veículo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
                   ],
                 ),
               ),
@@ -172,110 +154,49 @@ class _VehicleEditModalState extends State<VehicleEditModal> {
                     controller: scrollController,
                     padding: const EdgeInsets.all(16),
                     children: [
-                      TextFormField(
-                        controller: _marcaController,
-                        decoration: const InputDecoration(
-                          labelText: 'Marca *',
-                          border: OutlineInputBorder(),
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: _newSelectedImageBytes != null
+                                ? Image.memory(_newSelectedImageBytes!, fit: BoxFit.cover)
+                                : widget.vehicle.imagemUrl != null
+                                    ? Image.network(widget.vehicle.imagemUrl!, fit: BoxFit.cover)
+                                    : const Center(child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [Icon(Icons.add_a_photo, color: Colors.purple), Text("Trocar foto")],
+                                      )),
+                          ),
                         ),
-                        validator: (value) => _validateRequired(value, 'Marca'),
-                        textCapitalization: TextCapitalization.words,
                       ),
-                      
+                      const SizedBox(height: 24),
+                      TextFormField(controller: _marcaController, decoration: const InputDecoration(labelText: 'Marca', border: OutlineInputBorder()), validator: (v) => _validateRequired(v, 'Marca')),
                       const SizedBox(height: 16),
-                      
-                      TextFormField(
-                        controller: _modeloController,
-                        decoration: const InputDecoration(
-                          labelText: 'Modelo *',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) => _validateRequired(value, 'Modelo'),
-                        textCapitalization: TextCapitalization.words,
-                      ),
-                      
+                      TextFormField(controller: _modeloController, decoration: const InputDecoration(labelText: 'Modelo', border: OutlineInputBorder()), validator: (v) => _validateRequired(v, 'Modelo')),
                       const SizedBox(height: 16),
-                      
                       Row(
                         children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _anoController,
-                              decoration: const InputDecoration(
-                                labelText: 'Ano *',
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: _validateYear,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                            ),
-                          ),
+                          Expanded(child: TextFormField(controller: _anoController, decoration: const InputDecoration(labelText: 'Ano', border: OutlineInputBorder()), keyboardType: TextInputType.number)),
                           const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _corController,
-                              decoration: const InputDecoration(
-                                labelText: 'Cor *',
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: (value) => _validateRequired(value, 'Cor'),
-                              textCapitalization: TextCapitalization.words,
-                            ),
-                          ),
+                          Expanded(child: TextFormField(controller: _corController, decoration: const InputDecoration(labelText: 'Cor', border: OutlineInputBorder()), validator: (v) => _validateRequired(v, 'Cor'))),
                         ],
                       ),
-                      
                       const SizedBox(height: 16),
-                      
-                      TextFormField(
-                        controller: _precoController,
-                        decoration: const InputDecoration(
-                          labelText: 'Preço (R\$) *',
-                          border: OutlineInputBorder(),
-                          prefixText: 'R\$ ',
-                        ),
-                        validator: _validatePrice,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                        ],
-                      ),
-                      
+                      TextFormField(controller: _precoController, decoration: const InputDecoration(labelText: 'Preço', border: OutlineInputBorder()), validator: _validatePrice, keyboardType: TextInputType.numberWithOptions(decimal: true)),
                       const SizedBox(height: 16),
-                      
-                      TextFormField(
-                        controller: _descricaoController,
-                        decoration: const InputDecoration(
-                          labelText: 'Descrição *',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) => _validateRequired(value, 'Descrição'),
-                        maxLines: 3,
-                        textCapitalization: TextCapitalization.sentences,
-                      ),
-                      
+                      TextFormField(controller: _descricaoController, decoration: const InputDecoration(labelText: 'Descrição', border: OutlineInputBorder()), maxLines: 3),
                       const SizedBox(height: 32),
-                      
                       SizedBox(
                         height: 56,
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _saveChanges,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text(
-                                  'Salvar Alterações',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                          child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Salvar Alterações'),
                         ),
                       ),
                     ],

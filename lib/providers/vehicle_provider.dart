@@ -1,87 +1,84 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/vehicle.dart';
 
 class VehicleProvider extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  
   List<Vehicle> _vehicles = [];
   bool _isLoading = false;
+  
+  StreamSubscription<QuerySnapshot>? _streamSubscription;
 
   List<Vehicle> get vehicles => _vehicles;
   bool get isLoading => _isLoading;
 
-  VehicleProvider() {
-    _loadInitialData();
-  }
+  VehicleProvider();
 
-  void _loadInitialData() {
-    // Dados simulados iniciais
-    _vehicles = [
-      Vehicle(
-        id: '1',
-        marca: 'Toyota',
-        modelo: 'Corolla',
-        ano: 2022,
-        cor: 'Branco',
-        preco: 95000.00,
-        descricao: 'Sedan automático, completo, baixo km, revisões em dia',
-        imagemUrl: 'https://example.com/corolla.jpg',
-        dataCadastro: DateTime.now(),
-      ),
-      Vehicle(
-        id: '2',
-        marca: 'Honda',
-        modelo: 'Civic',
-        ano: 2023,
-        cor: 'Prata',
-        preco: 110000.00,
-        descricao: 'Sedan esportivo, turbo, multimídia, couro',
-        imagemUrl: 'https://example.com/civic.jpg',
-        dataCadastro: DateTime.now(),
-      ),
-      Vehicle(
-        id: '3',
-        marca: 'Volkswagen',
-        modelo: 'Jetta',
-        ano: 2021,
-        cor: 'Preto',
-        preco: 85000.00,
-        descricao: 'Sedan elegante, automático, ar digital',
-        imagemUrl: 'https://example.com/jetta.jpg',
-        dataCadastro: DateTime.now(),
-      ),
-      Vehicle(
-        id: '4',
-        marca: 'Ford',
-        modelo: 'EcoSport',
-        ano: 2020,
-        cor: 'Azul',
-        preco: 65000.00,
-        descricao: 'SUV compacto, manual, ideal para cidade',
-        imagemUrl: 'https://example.com/ecosport.jpg',
-        dataCadastro: DateTime.now(),
-      ),
-    ];
-    notifyListeners();
-  }
+  void subscribe() {
+    if (_streamSubscription != null) return;
 
-  Future<void> addVehicle(Vehicle vehicle) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      // Simular delay de rede
-      await Future.delayed(const Duration(milliseconds: 500));
-      
+      _streamSubscription = _firestore
+          .collection('vehicles')
+          .orderBy('dataCadastro', descending: true)
+          .snapshots()
+          .listen(
+        (snapshot) {
+          _vehicles = snapshot.docs.map((doc) {
+            return Vehicle.fromMap(doc.data(), doc.id);
+          }).toList();
+          _isLoading = false;
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('Erro no Stream do Firestore: $error');
+          _isLoading = false;
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      debugPrint('Erro ao tentar subscrever: $e');
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void unsubscribe() {
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _vehicles = [];
+    notifyListeners();
+  }
+
+  Future<void> addVehicle(Vehicle vehicle, {Uint8List? imageBytes}) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      String? imageUrl;
+      if (imageBytes != null) {
+        final fileName = 'vehicles/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final ref = _storage.ref().child(fileName);
+        await ref.putData(imageBytes, SettableMetadata(contentType: 'image/jpeg'));
+        imageUrl = await ref.getDownloadURL();
+      }
+
       final newVehicle = vehicle.copyWith(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        imagemUrl: imageUrl,
         dataCadastro: DateTime.now(),
       );
-      
-      _vehicles.insert(0, newVehicle); // Adicionar no início da lista
-      
-      // TODO: Implementar salvamento no Firestore
-      // await vehicleService.addVehicle(newVehicle);
-      
+
+      await _firestore.collection('vehicles').add(newVehicle.toMap());
     } catch (e) {
+      debugPrint('Erro ao adicionar: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -89,23 +86,24 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateVehicle(Vehicle vehicle) async {
+  Future<void> updateVehicle(Vehicle vehicle, {Uint8List? newImageBytes}) async {
     _isLoading = true;
     notifyListeners();
-
     try {
-      // Simular delay de rede
-      await Future.delayed(const Duration(milliseconds: 300));
-      
-      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
-      if (index != -1) {
-        _vehicles[index] = vehicle;
+      String? imageUrl = vehicle.imagemUrl;
+      if (newImageBytes != null) {
+        if (vehicle.imagemUrl != null) {
+          try { await _storage.refFromURL(vehicle.imagemUrl!).delete(); } catch (_) {}
+        }
+        final fileName = 'vehicles/${DateTime.now().millisecondsSinceEpoch}_updated.jpg';
+        final ref = _storage.ref().child(fileName);
+        await ref.putData(newImageBytes, SettableMetadata(contentType: 'image/jpeg'));
+        imageUrl = await ref.getDownloadURL();
       }
-      
-      // TODO: Implementar atualização no Firestore
-      // await vehicleService.updateVehicle(vehicle);
-      
+      final updatedVehicle = vehicle.copyWith(imagemUrl: imageUrl);
+      await _firestore.collection('vehicles').doc(vehicle.id).update(updatedVehicle.toMap());
     } catch (e) {
+      debugPrint('Erro ao atualizar: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -113,20 +111,16 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteVehicle(String vehicleId) async {
+  Future<void> deleteVehicle(String vehicleId, String? imageUrl) async {
     _isLoading = true;
     notifyListeners();
-
     try {
-      // Simular delay de rede
-      await Future.delayed(const Duration(milliseconds: 300));
-      
-      _vehicles.removeWhere((v) => v.id == vehicleId);
-      
-      // TODO: Implementar exclusão no Firestore
-      // await vehicleService.deleteVehicle(vehicleId);
-      
+      if (imageUrl != null) {
+        try { await _storage.refFromURL(imageUrl).delete(); } catch (_) {}
+      }
+      await _firestore.collection('vehicles').doc(vehicleId).delete();
     } catch (e) {
+      debugPrint('Erro ao deletar: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -139,9 +133,7 @@ class VehicleProvider extends ChangeNotifier {
       final matchesSearch = searchQuery.isEmpty ||
           vehicle.marca.toLowerCase().contains(searchQuery.toLowerCase()) ||
           vehicle.modelo.toLowerCase().contains(searchQuery.toLowerCase());
-      
       final matchesBrand = selectedBrand == 'Todas' || vehicle.marca == selectedBrand;
-      
       return matchesSearch && matchesBrand;
     }).toList();
   }

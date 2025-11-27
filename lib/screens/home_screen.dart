@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/vehicle_provider.dart';
 import 'vehicle_list_screen.dart';
 import 'add_vehicle_screen.dart';
 
@@ -16,6 +18,14 @@ class _HomeScreenState extends State<HomeScreen> {
     const VehicleListScreen(showAppBar: false),
     const AddVehicleScreen(showAppBar: false),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<VehicleProvider>(context, listen: false).subscribe();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

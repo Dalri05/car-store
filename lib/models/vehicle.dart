@@ -21,7 +21,6 @@ class Vehicle {
     this.dataCadastro,
   });
 
-  // Converter para Map (para Firestore)
   Map<String, dynamic> toMap() {
     return {
       'marca': marca,
@@ -35,7 +34,6 @@ class Vehicle {
     };
   }
 
-  // Criar a partir de Map (do Firestore)
   factory Vehicle.fromMap(Map<String, dynamic> map, String id) {
     return Vehicle(
       id: id,
@@ -52,7 +50,6 @@ class Vehicle {
     );
   }
 
-  // Criar cópia com modificações
   Vehicle copyWith({
     String? id,
     String? marca,

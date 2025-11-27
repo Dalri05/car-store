@@ -4,6 +4,7 @@ import '../models/vehicle.dart';
 import '../widgets/vehicle_card.dart';
 import '../widgets/vehicle_edit_modal.dart';
 import '../providers/vehicle_provider.dart';
+import '../services/auth_service.dart';
 
 class VehicleListScreen extends StatefulWidget {
   final bool showAppBar;
@@ -88,13 +89,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
     if (confirm == true && mounted) {
       try {
-        await Provider.of<VehicleProvider>(context, listen: false).deleteVehicle(vehicle.id!);
+        await Provider.of<VehicleProvider>(context, listen: false)
+            .deleteVehicle(vehicle.id!, vehicle.imagemUrl);
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veículo excluído com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Veículo excluído!'), backgroundColor: Colors.green),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -126,11 +125,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       ),
     );
 
-    if (confirm == true) {
-      // TODO: Implementar logout do Firebase
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
+    if (confirm == true && mounted) {
+      Provider.of<VehicleProvider>(context, listen: false).unsubscribe();
+      await Provider.of<AuthService>(context, listen: false).signOut();
     }
   }
 
@@ -156,7 +153,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           ) : null,
           body: Column(
             children: [
-              // Header com título quando não há AppBar
               if (!widget.showAppBar)
                 Container(
                   width: double.infinity,
@@ -200,13 +196,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   ),
                 ),
               
-              // Barra de pesquisa e filtros
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.white,
                 child: Column(
                   children: [
-                    // Campo de pesquisa
                     TextField(
                       controller: _searchController,
                       onChanged: _onSearchChanged,
@@ -234,10 +228,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         fillColor: Colors.grey[50],
                       ),
                     ),
-                    
                     const SizedBox(height: 12),
-                    
-                    // Filtro por marca
                     Row(
                       children: [
                         const Icon(Icons.filter_list, color: Color(0xFF6A1B9A)),
@@ -277,7 +268,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 ),
               ),
               
-              // Lista de veículos
               Expanded(
                 child: vehicleProvider.isLoading
                     ? const Center(child: CircularProgressIndicator())
@@ -318,7 +308,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           )
                         : RefreshIndicator(
                             onRefresh: () async {
-                              // Atualização já é automática com o provider
                             },
                             child: ListView.builder(
                               padding: const EdgeInsets.all(16),
