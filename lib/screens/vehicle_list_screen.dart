@@ -127,7 +127,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
     if (confirm == true && mounted) {
       Provider.of<VehicleProvider>(context, listen: false).unsubscribe();
-      await Provider.of<AuthService>(context, listen: false).signOut();
+      
+      final authService = Provider.of<AuthService>(context, listen: false);
+      if (authService.currentUser != null) {
+        await authService.signOut();
+      } else {
+        Navigator.pushReplacementNamed(context, '/');
+      }
     }
   }
 
